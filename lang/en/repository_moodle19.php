@@ -24,6 +24,7 @@
  */
 
 $string['download'] = 'Download';
+$string['listcoursesandfiles'] = 'List Courses and Backup Files';
 $string['rename'] = 'Name';
 $string['pluginname'] = 'Moodle19 Import';
 $string['moodle19'] = 'Moodle19 Import';
@@ -31,3 +32,7 @@ $string['moodle19:view'] = 'Use URL downloader in file picker';
 $string['validname'] = 'You must provide a valid file name';
 $string['configplugin'] = 'URL repository type configuration';
 $string['courseid'] = 'Course ID';
+$string['courses'] = 'Courses';
+
+$string['moodle19server'] = 'Moodle19 server url';
+$string['secret'] = 'Secret';
