@@ -1,0 +1,33 @@
+Overview
+========
+Allow teachers to easily restore backup courses from Moodle 1.9 to Moodle 2+ systems
+It is using the user's ID (username) to get a list of backup courses a user has on the Moodle 1.9 system
+And allow him/her to choose one to be silently copied over the network and restored into the current Moodle 2+
+system he/she was using this repository from.
+
+The process is relatively secured by a secret key the administrator of both system has to setup initially.
+
+Install
+=======
+
+1. git clone https://github.com/mofet/repository_moodle19 (or unzip and copy moodle19 folder into your-moodle2/repository folder)
+2. As administrator on the Moodle 2+ system, navigate to "Site Administration -> Plugins -> Repositories -> Manage Repositories -> Moodle19" (http://your-moodle2/admin/repository.php?sesskey=7xxzGV0OT0&action=edit&repos=moodle19)
+3. Set the Moodle19 URL and a Secret
+4. Copy to file moodle19/remote_moodle19/admin/ws_get_teacher_courses.php to your other moodle 1.9 server under admin/ws_get_teacher_courses.php
+5. Copy to file moodle19/remote_moodle19/admin/settings/mnet_moodle2.php to your other moodle 1.9 server under admin/settings/mnet_moodle2.php
+6. As administrator on the Moodle 1.9 system, navigate to "Notifications" (to install and first time setup)
+Later, as administrator on the Moodle 1.9 system, you can always update the settings at "Home -> Administration -> Networking -> Experimental" (http://your-moodle19/admin/settings.php?section=experimental)
+7. Set a common Secret
+8. Now, you are ready to go!
+
+Navigate to the Moodle 2 frontpage
+> Restore
+> Add/Select File
+> Moodle 1.9 (repository)
+> Select a backup
+> Start regular restore process
+
+For support and feedback, please contact Nadav Kavalerchik, nadavkav@gmail.com
+Updated version can be found @ https://github.com/mofet/repository_moodle19
+
+Enjoy :-)
