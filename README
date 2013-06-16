@@ -17,7 +17,7 @@ Install
 5. Copy to file moodle19/remote_moodle19/admin/settings/mnet_moodle2.php to your other moodle 1.9 server under admin/settings/mnet_moodle2.php
 6. As administrator on the Moodle 1.9 system, navigate to "Notifications" (to install and first time setup)
 Later, as administrator on the Moodle 1.9 system, you can always update the settings at "Home -> Administration -> Networking -> Experimental" (http://your-moodle19/admin/settings.php?section=experimental)
-7. Set a common Secret
+7. Set a common Secret and set the Moodle 2+ server name (security feature)
 8. Now, you are ready to go!
 
 Navigate to the Moodle 2 frontpage

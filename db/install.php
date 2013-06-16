@@ -15,13 +15,13 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Installation for the URL repository
+ * This plugin enable users (Teachers) to import remote Moodle 1.9.x backup files into current Moodle 2+
  *
+ * @since 2.4
  * @package    repository_moodle19
- * @category   repository
+ * @copyright  2013 Nadav Kavalerchik {@link http://github.com/nadavkav}
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
 /**
  * Create a default instance of the URL repository
  *

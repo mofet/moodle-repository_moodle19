@@ -16,11 +16,12 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Strings for component 'repository_moodle19', language 'en', branch 'MOODLE_23_STABLE'
+ * This plugin enable users (Teachers) to import remote Moodle 1.9.x backup files into current Moodle 2+
  *
- * @package   repository_moodle19
- * @copyright 1999 onwards Martin Dougiamas  {@link http://moodle.com}
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @since 2.4
+ * @package    repository_moodle19
+ * @copyright  2013 Nadav Kavalerchik {@link http://github.com/nadavkav}
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 $string['download'] = 'Download';
@@ -36,3 +37,4 @@ $string['courses'] = 'Courses';
 
 $string['moodle19server'] = 'Moodle19 server url';
 $string['secret'] = 'Secret';
+$string['manual'] = 'Manual user credentials';

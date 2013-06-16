@@ -15,11 +15,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Plugin capabilities.
+ * This plugin enable users (Teachers) to import remote Moodle 1.9.x backup files into current Moodle 2+
  *
+ * @since 2.4
  * @package    repository_moodle19
- * @copyright  2009 Dongsheng Cai
- * @author     Dongsheng Cai <dongsheng@moodle.com>
+ * @copyright  2013 Nadav Kavalerchik {@link http://github.com/nadavkav}
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
