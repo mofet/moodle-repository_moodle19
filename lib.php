@@ -62,7 +62,12 @@ class repository_moodle19 extends repository {
         $this->iv_base64 = base64_encode($this->iv);
 
         //$this->moodle19sever = 'http://localhost/moodle-macam/moodle/';
-        $this->moodle19sever = $moodle19server = get_config('moodle19', 'moodle19server');
+        $moodle19server = get_config('moodle19', 'moodle19server');
+        if (stripos(strrev($moodle19server), '/') !== 0){
+            $moodle19server.='/';
+        }
+        $this->ws_endpoint_url = $moodle19server.'admin/ws_get_teacher_courses.php';
+
         $this->secret = get_config('moodle19', 'secret');
         $this->manual = get_config('moodle19', 'manual');
 
@@ -195,6 +200,43 @@ EOD;
         }
     }
 
+    /**
+     * Send a POST requst using cURL
+     * @param string $url to request
+     * @param array $post values to send
+     * @param array $options for cURL
+     * @return string
+     */
+    function curl_post($url, array $post = NULL, array $options = array())
+    {
+        $defaults = array(
+            CURLOPT_POST => 1,
+            CURLOPT_HEADER => 0,
+            CURLOPT_URL => $url,
+            CURLOPT_FRESH_CONNECT => 1,
+            CURLOPT_RETURNTRANSFER => 1,
+            CURLOPT_FORBID_REUSE => 1,
+            CURLOPT_TIMEOUT => 4,
+            CURLOPT_POSTFIELDS => http_build_query($post)
+        );
+
+        $ch = curl_init();
+        curl_setopt_array($ch, ($options + $defaults));
+        if(($result = curl_exec($ch)) === false)
+        {
+            trigger_error(curl_error($ch));
+        }
+
+        $response = new stdClass();
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        $response->status_code = $http_status;
+        $response->data = $result;
+
+        curl_close($ch);
+        return $response;
+    }
+
 
     /**
      * @return array of user's courses and list of backup files within each course
@@ -211,16 +253,14 @@ EOD;
 
         $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,$this->iv);
 
-        $options = array(
-            'http'=>array(
-                'method'=>"POST",
-                'header'=>"Accept-language: en\r\n".
-                          "Content-type: application/x-www-form-urlencoded\r\n",
-                'content'=>http_build_query(array('request'=>base64_encode($this->iv.$data))) // send the IV + DATA
-            ));
-        $context = stream_context_create($options);
-        $courselist_json = file_get_contents($this->moodle19sever.'ws_get_teacher_courses.php',false,$context);
-        $this->courselist = json_decode($courselist_json);
+        $result = $this->curl_post($this->ws_endpoint_url,array('request'=>base64_encode($this->iv.$data)));
+
+        if ($result->status_code != 200){   //Print error to enable debugging
+            print_r($result->data);
+        }
+        else {
+            $this->courselist = json_decode($result->data);
+        }
 
         if ($returnlist) {
             return $this->courselist;
@@ -229,22 +269,6 @@ EOD;
                 return false;
             } else return true;
         }
-
-        /* old experiment - does not work - remove!
-        $ch = curl_init();
-        curl_setopt($ch,CURLOPT_URL, $this->moodle19sever.'ws_get_teacher_courses.php?');
-        //echo "debug ws url = ".$this->moodle19sever.'ws_get_teacher_courses.php?'.$fields_string;
-        //echo 'url='.$this->moodle19sever.'ws_get_teacher_courses.php?'.$request;
-        //curl_setopt($ch,CURLOPT_POST, count($fields));
-        curl_setopt($ch,CURLOPT_POST, true); // $iv & $request
-        //curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
-        curl_setopt($ch,CURLOPT_POSTFIELDS, $request);
-        curl_setopt($ch,CURLOPT_RETURNTRANSFER, '1');
-        $courselist_json = curl_exec($ch);
-        curl_close($ch);
-
-        return json_decode($courselist_json);
-        */
     }
 
     /**
@@ -266,27 +290,16 @@ EOD;
 
     public function list_backupcoursesandfiles() {
 
-// Enable much higher security...
-//
-//        $fields = array(
-//            'username' => $this->username,
-//            'password' => $this->password,
-//            'action' => 'download',
-//        );
-//        $base64_json_request = base64_encode(json_encode($fields));
-//
-//        $data_encoded = urlencode($this->iv.mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,$this->iv));
-
         $courses_array = array();
         $files_array = array();
 
-        if (empty($this->courselist)) {
-            // populate $this->courselist
-            $this->get_remote_course_list();
+        if (empty($this->courselist) && !$this->get_remote_course_list()) {
+           return $courses_array;
         }
 
         foreach ($this->courselist as $course) {
-            foreach ($course->backupfilelist as $id => $backupfile) {
+            if (!empty($course->backupfilelist)){
+                foreach ($course->backupfilelist as $id => $backupfile) {
                     // backup file(s)
                     $files_array[] = array(
                         'title'=>$backupfile->name,
@@ -302,6 +315,8 @@ EOD;
                     );
 
                 }
+            }
+
             $courses_array[] = array('title'=>$course->fullname,'children'=>$files_array);
             unset($files_array);
         }

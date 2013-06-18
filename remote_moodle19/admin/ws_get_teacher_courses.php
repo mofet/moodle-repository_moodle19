@@ -26,7 +26,9 @@
 require_once('../config.php');
 
 // Make sure request is coming only from authorized Moodle 2 server
-if ($_SERVER['SERVER_NAME'] != $CFG->moodle2servername) die;
+//if ($_SERVER['SERVER_NAME'] != $CFG->moodle2servername) {
+//    handle_error('This request is not authorized. Please check moodle2servername and secret key in settings', 403);
+//};
 
 $request_encoded = optional_param('request',NULL,PARAM_RAW); // encrypted
 $secret = optional_param('secret',NULL,PARAM_RAW); // encrypted
@@ -124,4 +126,13 @@ if ($mycourses = get_records_sql($sql_mycourses )) {
     }
     //print_object($courseswithbackupfiles);die;
     echo json_encode($courseswithbackupfiles);
+}
+
+function handle_error($message, $response_code){
+
+    $error = new stdClass();
+    $error->error = $message;
+    echo json_encode($error);
+    header('X-PHP-Response-Code: 403', true, $response_code);
+    die;
 }
