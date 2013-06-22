@@ -260,12 +260,12 @@ EOD;
     /**
      * @return array of user's courses and list of backup files within each course
      */
-    private function get_remote_course_list($type, $id) {
+    private function get_remote_data($type, $id, $action) {
 
         $fields = array(
             'username' => $this->username,
             'password' => $this->password,
-            'action' => 'list',
+            'action' => $action,
             'courses4usertoken' => $this->courses4usertoken
         );
 
@@ -284,49 +284,11 @@ EOD;
             print_r($result->data);
         }
         else {
-            $this->list = json_decode($result->data);
+           return json_decode($result->data);
         }
-
-        if (empty($this->list)) {
-            return false;
-        } else return true;
-
     }
 
-    public function get_remote_navbar($type, $id){
-        $fields = array(
-            'username' => $this->username,
-            'password' => $this->password,
-            'action' => 'navbar',
-            'courses4usertoken' => $this->courses4usertoken
-        );
 
-        if (isset($type) && isset($id)){
-            $fields['type'] = $type;
-            $fields['id'] = $id;
-        }
-
-        $base64_json_request = base64_encode(json_encode($fields));
-
-        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,$this->iv);
-
-        $result = $this->curl_post($this->ws_endpoint_url,array('request'=>urlencode(base64_encode($this->iv.$data))));
-
-        if ($result->status_code != 200){   //Print error to enable debugging
-            print_r($result->data);
-        }
-        else {
-            $this->navbar = json_decode($result->data);
-        }
-
-        if (empty($this->navbar)) {
-            return false;
-        } else return true;
-
-
-
-
-    }
 
     public function get_file($url, $filename=""){
 
@@ -354,9 +316,8 @@ EOD;
      */
     public function get_listing($path='', $page='') {
         $backupfiles = array();
-        $backupfiles['path'] = $this->get_navbar($path);
+        $backupfiles['path'] = $this->get_navbar($path, $this->courses4usertoken);
         $backupfiles['list'] = $this->get_list($path);
-        //$backupfiles['list'] = array();
         $backupfiles['dynload'] = true;
         $backupfiles['nologin'] = false;
         $backupfiles['nosearch'] = true;
@@ -366,21 +327,19 @@ EOD;
     }
 
 
-    public function get_list($path) {
-
-        $list = array();
+    private function get_list($path) {
 
         $id = $type = null;
+        $list = array();
 
         if (isset($path) && !empty($path)){
             list($type, $id) = explode('|', $path);
         }
 
-        if (empty($this->list) && !$this->get_remote_course_list($type, $id)) {
-           return $list;
-        }
 
-        foreach ($this->list as $entry) {
+        $remote_list = $this->get_remote_data($type, $id, 'list');
+
+        foreach ($remote_list as $entry) {
             if ($entry->type == 'course'){
                 $list[] =  $this->build_course_entry($entry);
             }
@@ -415,9 +374,9 @@ EOD;
     }
 
     // generate repository course navigation PATH
-    public function get_navbar($path='') {
+    private function get_navbar($path='', $username) {
 
-        $nav_bar = array(array('name' => 'root', 'path' => ''));
+        $nav_bar = array(array('name' => $username, 'path' => ''));
 
         $id = $type = null;
 
@@ -428,12 +387,10 @@ EOD;
             return $nav_bar;
         }
 
-        if (empty($this->navbar) && !$this->get_remote_navbar($type, $id)) {
-            return $nav_bar;
-        }
+        $list = $this->get_remote_data($type, $id, 'navbar');
 
 
-        foreach($this->navbar as $navbar_entry){
+        foreach($list as $navbar_entry){
             $nav_bar[] = array('name' => $navbar_entry->name, 'path' => $navbar_entry->type.'|'.$navbar_entry->id);
         }
         return $nav_bar;

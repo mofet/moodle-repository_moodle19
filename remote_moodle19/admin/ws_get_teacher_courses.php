@@ -46,6 +46,8 @@ if (!is_request_valid($request)){
 
 $action = optional_param('action',NULL,PARAM_RAW);
 
+
+
 switch ($request->action){
 
     // If we got a "download" request then send back the backup file
@@ -106,27 +108,21 @@ switch ($request->action){
             //do notihing (empty list)
         }
         else if ($request->type == 'category' && isset($request->id)){
+            $list = prepare_navbar_category_list($request->id);
+        }
+        else if ($request->type == 'course' && isset($request->id)){
+            $course = get_record('course', 'id', $request->id);
 
-            $path = get_record('course_categories', 'id', $request->id);
+            $list = prepare_navbar_category_list($course->category);
 
-            $path_items = explode('/', $path->path);
-            //handle_error($path_items, 500);
-            foreach($path_items as $cat_id){
-                if (empty($cat_id)){
-                    continue;
-                }
+            $course_entry = new stdClass();
 
-                $category = get_record('course_categories', 'id', $cat_id);
+            $course_entry->id = $request->id;
+            $course_entry->type = $request->type;
+            $course_entry->name = $course->shortname;
 
-                if (isset($category)){
-                    $cat_entry = new stdClass();
-                    $cat_entry->id = $category->id;
-                    $cat_entry->name = $category->name;
-                    $cat_entry->type = 'category';
-                    $list[] = $cat_entry;
-                }
+            $list[] = $course_entry;
 
-            }
 
         }
 
@@ -253,6 +249,35 @@ function preapare_course_backup_list($backupfolder, $courseid){
 
     return $list;
 
+}
+
+
+function prepare_navbar_category_list($id)
+{
+
+    $list = array();
+
+    $path = get_record('course_categories', 'id', $id);
+
+    $path_items = explode('/', $path->path);
+    //handle_error($path_items, 500);
+    foreach ($path_items as $cat_id) {
+        if (empty($cat_id)) {
+            continue;
+        }
+
+        $category = get_record('course_categories', 'id', $cat_id);
+
+        if (isset($category)) {
+            $cat_entry = new stdClass();
+            $cat_entry->id = $category->id;
+            $cat_entry->name = $category->name;
+            $cat_entry->type = 'category';
+            $list[] = $cat_entry;
+        }
+
+    }
+    return $list;
 }
 
 
