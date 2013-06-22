@@ -24,7 +24,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 require_once($CFG->dirroot . '/repository/lib.php');
-//require_once(dirname(__FILE__).'/locallib.php');
 
 /**
  * repository_moodle19 class
@@ -52,6 +51,8 @@ class repository_moodle19 extends repository {
     public function __construct($repositoryid, $context = SYSCONTEXTID, $options = array()){
         parent::__construct($repositoryid, $context, $options);
 
+        global $SESSION;
+
         // The following mathematical calculation takes "long" time so we do it once
         // It safe enough not to redo it for every WS connection we open to the Moodle 19 server
 
@@ -71,20 +72,38 @@ class repository_moodle19 extends repository {
         $this->secret = get_config('moodle19', 'secret');
         $this->manual = get_config('moodle19', 'manual');
 
-    }
+        $this->sessname = 'repository_moodle19';
 
-    public function check_login() {
+        //Deal with user loggin in
         $this->username = optional_param('username', '', PARAM_RAW);
         $this->password = optional_param('password', '', PARAM_RAW);
         $this->courses4usertoken = optional_param('courses4usertoken', '', PARAM_RAW);
 
-        //if (!empty($this->courseid)) {
-        if (!empty($this->username)) {
-            return true;
+        if (!empty($this->username) && !empty($this->password)) {
+
+            $SESSION->{$this->sessname} = $this->username.'|'.$this->password;
+
+            if (!empty($this->courses4usertoken)){
+                $SESSION->{$this->sessname}.= '|'.$this->courses4usertoken;
+            }
         } else {
-            //$this->usertoken = optional_param('usertoken', '', PARAM_RAW);
-            return false;
+            if (!empty($SESSION->{$this->sessname})) {
+              list($this->username, $this->password, $this->courses4usertoken) = explode('|', $SESSION->{$this->sessname});
+            }
         }
+
+
+    }
+
+    public function check_login() {
+        global $SESSION;
+        return !empty($SESSION->{$this->sessname});
+    }
+
+    public function logout(){
+        global $SESSION;
+        unset($SESSION->{$this->sessname});
+        return $this->print_login();
     }
 
     /**
@@ -183,7 +202,7 @@ class repository_moodle19 extends repository {
 
             $ret['login_btn_label'] = get_string('listcoursesandfiles', 'repository_moodle19');
 
-            $ret['allowcaching'] = true; // indicates that login form can be cached in filepicker.js
+            //$ret['allowcaching'] = true; // indicates that login form can be cached in filepicker.js
             return $ret;
         } else {
             // Not implemented!!!
@@ -241,34 +260,91 @@ EOD;
     /**
      * @return array of user's courses and list of backup files within each course
      */
-    public function get_remote_course_list($returnlist = false) {
+    private function get_remote_course_list($type, $id) {
 
         $fields = array(
             'username' => $this->username,
             'password' => $this->password,
-            'action' => 'courselist',
+            'action' => 'list',
             'courses4usertoken' => $this->courses4usertoken
         );
+
+        if (isset($type) && isset($id)){
+            $fields['type'] = $type;
+            $fields['id'] = $id;
+        }
+
         $base64_json_request = base64_encode(json_encode($fields));
 
         $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,$this->iv);
 
-        $result = $this->curl_post($this->ws_endpoint_url,array('request'=>base64_encode($this->iv.$data)));
+        $result = $this->curl_post($this->ws_endpoint_url,array('request'=>urlencode(base64_encode($this->iv.$data))));
 
         if ($result->status_code != 200){   //Print error to enable debugging
             print_r($result->data);
         }
         else {
-            $this->courselist = json_decode($result->data);
+            $this->list = json_decode($result->data);
         }
 
-        if ($returnlist) {
-            return $this->courselist;
-        } else {
-            if (empty($this->courselist)) {
-                return false;
-            } else return true;
+        if (empty($this->list)) {
+            return false;
+        } else return true;
+
+    }
+
+    public function get_remote_navbar($type, $id){
+        $fields = array(
+            'username' => $this->username,
+            'password' => $this->password,
+            'action' => 'navbar',
+            'courses4usertoken' => $this->courses4usertoken
+        );
+
+        if (isset($type) && isset($id)){
+            $fields['type'] = $type;
+            $fields['id'] = $id;
         }
+
+        $base64_json_request = base64_encode(json_encode($fields));
+
+        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,$this->iv);
+
+        $result = $this->curl_post($this->ws_endpoint_url,array('request'=>urlencode(base64_encode($this->iv.$data))));
+
+        if ($result->status_code != 200){   //Print error to enable debugging
+            print_r($result->data);
+        }
+        else {
+            $this->navbar = json_decode($result->data);
+        }
+
+        if (empty($this->navbar)) {
+            return false;
+        } else return true;
+
+
+
+
+    }
+
+    public function get_file($url, $filename=""){
+
+        $fields = array(
+          'action' => 'download',
+          'username' => $this->username,
+          'password' => $this->password,
+          'courses4usertoken' => $this->courses4usertoken,
+          'file' => $url
+        );
+
+        $base64_json_request = base64_encode(json_encode($fields));
+
+        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,$this->iv);
+
+        $url = $this->ws_endpoint_url.'?request='.urlencode(base64_encode($this->iv.$data));
+
+        return parent::get_file($url, $filename);
     }
 
     /**
@@ -278,69 +354,89 @@ EOD;
      */
     public function get_listing($path='', $page='') {
         $backupfiles = array();
-        $backupfiles['path'] = $this->list_backupcourses();
-        $backupfiles['list'] = $this->list_backupcoursesandfiles();
+        $backupfiles['path'] = $this->get_navbar($path);
+        $backupfiles['list'] = $this->get_list($path);
+        //$backupfiles['list'] = array();
+        $backupfiles['dynload'] = true;
         $backupfiles['nologin'] = false;
         $backupfiles['nosearch'] = true;
-        $backupfiles['norefresh'] = true;
+        $backupfiles['norefresh'] = false;
 
         return $backupfiles;
     }
 
 
-    public function list_backupcoursesandfiles() {
+    public function get_list($path) {
 
-        $courses_array = array();
-        $files_array = array();
+        $list = array();
 
-        if (empty($this->courselist) && !$this->get_remote_course_list()) {
-           return $courses_array;
+        $id = $type = null;
+
+        if (isset($path) && !empty($path)){
+            list($type, $id) = explode('|', $path);
         }
 
-        foreach ($this->courselist as $course) {
-            if (!empty($course->backupfilelist)){
-                foreach ($course->backupfilelist as $id => $backupfile) {
-                    // backup file(s)
-                    $files_array[] = array(
-                        'title'=>$backupfile->name,
-                        'date'=>$backupfile->date,
-                        'size'=>$backupfile->size,
-                        //'thumbnail'=>$thumbnail,
-                        'thumbnail_width'=>16,
-                        'thumbnail_height'=>16,
-                        // plugin-dependent unique path to the file (id, url, path, etc.)
-                        'source'=>"{$this->moodle19sever}ws_get_teacher_courses.php?secret=".md5($this->secret)."&action=download&backupfile={$course->id}/backupdata/{$backupfile->name}",
-                        // the accessible url of the file
-                        //'url'=>"{$this->moodle19sever}/ws_get_backupfile.php?file={$course->id}/backupdata/{$backupfile}"
-                    );
+        if (empty($this->list) && !$this->get_remote_course_list($type, $id)) {
+           return $list;
+        }
 
-                }
+        foreach ($this->list as $entry) {
+            if ($entry->type == 'course'){
+                $list[] =  $this->build_course_entry($entry);
+            }
+            else if ($entry->type == 'category'){
+                $list[] = $this->build_category_entry($entry);
+            }
+            else if ($entry->type == 'backup_file'){
+                $list[] = $this->build_backupfile_entry($entry, $id);
+            }
+            else {
+                continue;
             }
 
-            $courses_array[] = array('title'=>$course->fullname,'children'=>$files_array);
-            unset($files_array);
         }
-        return $courses_array;
+        return $list;
+    }
+
+    private function build_category_entry($entry){
+        return array('title' => $entry->name, 'path' => 'category|'.$entry->id, 'children' => array());
+    }
+
+    private function build_course_entry($entry){
+
+
+       return  array('title'=>$entry->name, 'path' => 'course|'.$entry->id, 'children'=>array());
+    }
+
+    private function build_backupfile_entry($entry, $courseid){
+        $source = $courseid.'|'.$entry->name;
+        return array('title'=> $entry->name, 'date' => $entry->date, 'size' => $entry->size, 'source' => $source);
+
     }
 
     // generate repository course navigation PATH
-    public function list_backupcourses() {
-        // not implemented
-        // see: http://docs.moodle.org/dev/Repository_plugins#get_listing.28.24path.3D.22.22.2C_.24page.3D.22.22.29
-        return $courses_array = array(array('name'=>get_string('courses','repository_moodle19'),'path'=>'/'));
+    public function get_navbar($path='') {
 
-        /*
-        if (empty($this->courselist)) {
-            // populate $this->courselist
-            $this->get_remote_course_list();
+        $nav_bar = array(array('name' => 'root', 'path' => ''));
+
+        $id = $type = null;
+
+        if (isset($path) && !empty($path)){
+            list($type, $id) = explode('|', $path);
+        }
+        else {
+            return $nav_bar;
         }
 
-        foreach ($this->courselist as $course) {
-            $courses_array[] = array('name'=>$course->fullname,'path'=>'/'.$course->id);
+        if (empty($this->navbar) && !$this->get_remote_navbar($type, $id)) {
+            return $nav_bar;
         }
 
-        return $courses_array;
-        */
+
+        foreach($this->navbar as $navbar_entry){
+            $nav_bar[] = array('name' => $navbar_entry->name, 'path' => $navbar_entry->type.'|'.$navbar_entry->id);
+        }
+        return $nav_bar;
     }
 
     public function supported_returntypes() {
@@ -354,7 +450,7 @@ EOD;
      * @return string|null
      */
     public function get_file_source_info($url) {
-        return $url;
+        return $this->sessname.':'.$url;
     }
 
     public static function get_type_option_names() {
