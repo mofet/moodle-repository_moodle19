@@ -1,7 +1,7 @@
 Overview
 ========
 Allow teachers to easily restore backup courses from Moodle 1.9 to Moodle 2+ systems
-It is using the user's ID (username) to get a list of backup courses a user has on the Moodle 1.9 system
+This repository uses the user's ID (username) to get a list of backup courses a user has on the Moodle 1.9 system
 And allow him/her to choose one to be silently copied over the network and restored into the current Moodle 2+
 system he/she was using this repository from.
 
@@ -13,11 +13,14 @@ Install
 1. git clone https://github.com/mofet/repository_moodle19 (or unzip and copy moodle19 folder into your-moodle2/repository folder)
 2. As administrator on the Moodle 2+ system, navigate to "Site Administration -> Plugins -> Repositories -> Manage Repositories -> Moodle19" (http://your-moodle2/admin/repository.php?sesskey=7xxzGV0OT0&action=edit&repos=moodle19)
 3. Set the Moodle19 URL and a Secret
+4. Optionally set MANUAL mode to TRUE or FALSE. When manual mode is true user will have to type in his credentials in the MOODLE 1.9 system which will be validated there. When set to FALSE currently logged in username will be used. NOTE: This requires 'Require Password' setting on Moodle1.9 server to be turned off.
 4. Copy to file moodle19/remote_moodle19/admin/ws_get_teacher_courses.php to your other moodle 1.9 server under admin/ws_get_teacher_courses.php
 5. Copy to file moodle19/remote_moodle19/admin/settings/mnet_moodle2.php to your other moodle 1.9 server under admin/settings/mnet_moodle2.php
 6. As administrator on the Moodle 1.9 system, navigate to "Notifications" (to install and first time setup)
-Later, as administrator on the Moodle 1.9 system, you can always update the settings at "Home -> Administration -> Networking -> Experimental" (http://your-moodle19/admin/settings.php?section=experimental)
+Later, as administrator on the Moodle 1.9 system, you can always update the settings at "Home -> Administration -> Networking -> Course Export Webservice" (http://your-moodle19/admin/settings.php?section=course_export_ws)
 7. Set a common Secret and set the Moodle 2+ server name (security feature)
+8. Optionally turn off require password setting. NOTE: When this is off no password validation is done on incoming credentials from remote server. USE WITH CARE! (Use this only if usernames match on both servers)
+9. Optionally turn on Request on behalf setting. This will allow system admins (ONLY system admins) to restore courses on behalf of other users. NOTE: When Require password is off and Allow restore on behalf is on the remote system is responsible for allowing only admins to use this option.
 8. Now, you are ready to go!
 
 Navigate to the Moodle 2 frontpage
@@ -27,7 +30,7 @@ Navigate to the Moodle 2 frontpage
 > Select a backup
 > Start regular restore process
 
-For support and feedback, please contact Nadav Kavalerchik, nadavkav@gmail.com
+For support and feedback, please contact Nadav Kavalerchik, nadavkav@gmail.com or Nitzan Bar nitzanbar@macam.ac.il
 Updated version can be found @ https://github.com/mofet/repository_moodle19
 
 Enjoy :-)

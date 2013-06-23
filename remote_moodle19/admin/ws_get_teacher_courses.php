@@ -20,6 +20,7 @@
  * @since 2.4
  * @package    repository_moodle19
  * @copyright  2013 Nadav Kavalerchik {@link http://github.com/nadavkav}
+ * @copyright  2013 Nitzan Bar {@link http://github.com/nitzo}
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -41,10 +42,11 @@ if (!empty($preferences->backup_sche_destination)){
 $request = decode_request($request_encoded);
 
 if (!is_request_valid($request)){
-    handle_error('Unauthorized request!', 403);
+    handle_error('Request is not valid!', 500);
 }
 
-$action = optional_param('action',NULL,PARAM_RAW);
+
+$teacher = authenticate_and_get_user($request);
 
 
 
@@ -77,8 +79,6 @@ switch ($request->action){
     // We are probably asked for a course list
     case 'list':
 
-        $user = authenticate_user($request->username, $request->password, $request->courses4usertoken);
-
         $list = null;
         if (!isset($request->type)){
             $list = prepare_category_list();
@@ -87,7 +87,7 @@ switch ($request->action){
         else if ($request->type == 'category' && isset($request->id)){
 
             $categories_list = prepare_category_list($request->id);
-            $course_list  = prepare_course_list($user, $request->id);
+            $course_list  = prepare_course_list($teacher, $request->id);
 
             $list = array_merge($categories_list, $course_list);
             //handle_error($course_list, 500);
@@ -177,30 +177,50 @@ function decode_request($request_encoded){
     return $request;
 }
 
-function authenticate_user($username, $password, $courses4usertoken){
+function authenticate_and_get_user($request){
+    global $CFG;
 
-    // Authentication...
-    //
+    $teacher = null;
 
-    // for now, we use the unique username which is T"Z (ID Number)
-    // to link a Moodle 2 user with the same Moodle 19 user (Teacher)
-    // So, $usertoken is actually = username (from user table)
-    $requesting = get_record('user','username',$username);
-    if (empty($requesting)) die; // did not find user. oups :-(
-    //echo "we have a user";
-    // Make sure you copy Moodle 19 salt to Moodle 2
-    // before we compare these MD5 passwards
-    // DISABLED!!! due to lack of Moodle 19 salt in config.php
-    //echo "pass=".$teacher->password;
-    if (md5($password) != $requesting->password) die;
-    //echo "we have a password";
+    if (!isset($CFG->repository_moodle19_require_user_password) || $CFG->repository_moodle19_require_user_password == true){
+        $requesting_user = authenticate_user_login($request->username, $request->password);
+    }
+    else {
+        $requesting_user = get_record('user','username',$request->username);
+    }
 
+    // did not find user or authentication failed
+    if (!isset($requesting_user) || empty($requesting_user)){
+        handle_error('Unauthorized request!', 403);
+    }
 
-    // get actual userid for actual course request (if Admin is not making the request then it is the actual teacher)
-    $teacher = get_record('user','username',$courses4usertoken);
+    //if restoring on behalf of a user - verify this is allowed and get actual user
+    if (isset($request->courses4usertoken) && !empty($request->courses4usertoken)){
+
+        if (isset($CFG->repository_moodle19_allow_restore_onbehalf) && $CFG->repository_moodle19_allow_restore_onbehalf && is_siteadmin($requesting_user->id)){
+            $teacher = get_record('user','username',$request->courses4usertoken);
+        }
+
+        if (!isset($teacher) || empty($teacher)){
+            handle_error('Unauthorized request! Cannot restore on behalf. Please verify settings.', 403);
+        }
+
+    }
+    else {
+        $teacher =  $requesting_user;
+    }
+
+    //If requesting a course make sure user is teacher in course
+    if (!empty($teacher) && isset($request->type) && $request->type == 'course'){
+        $context = get_context_instance(CONTEXT_COURSE, $request->id);
+        if (!user_has_role_assignment($teacher->id, 3, $context->id)){
+            handle_error('User is not a teacher in course!!!', 403);
+        }
+    }
 
 
     return $teacher;
+
 }
 
 function prepare_course_list($teacher, $category){
@@ -212,7 +232,6 @@ function prepare_course_list($teacher, $category){
                     AND c.category = '".$category."'
                     ORDER BY c.id DESC";
 
-//echo $sql_mycourses;
 
     $list = array();
     if ($mycourses = get_records_sql($sql_mycourses )) {
@@ -292,7 +311,7 @@ function handle_error($message, $response_code){
 }
 
 function is_request_valid($request){
-    global $CFG;
+
 
     //handle_error($request, 500);
     if (!isset($request) || !isset($request->action)){
@@ -302,6 +321,9 @@ function is_request_valid($request){
     switch ($request->action) {
 
         case 'download':
+            if (!isset($request->file)){
+                return false;
+            }
             return true;
             break;
 

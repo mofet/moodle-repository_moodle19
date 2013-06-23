@@ -21,6 +21,7 @@
  * @since 2.4
  * @package    repository_moodle19
  * @copyright  2013 Nadav Kavalerchik {@link http://github.com/nadavkav}
+ * @copyright  2013 Nitzan Bar {@link http://github.com/nitzo}
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 require_once($CFG->dirroot . '/repository/lib.php');
@@ -51,7 +52,7 @@ class repository_moodle19 extends repository {
     public function __construct($repositoryid, $context = SYSCONTEXTID, $options = array()){
         parent::__construct($repositoryid, $context, $options);
 
-        global $SESSION;
+
 
         // The following mathematical calculation takes "long" time so we do it once
         // It safe enough not to redo it for every WS connection we open to the Moodle 19 server
@@ -74,26 +75,67 @@ class repository_moodle19 extends repository {
 
         $this->sessname = 'repository_moodle19';
 
-        //Deal with user loggin in
+        //Deal with user logging in
         $this->username = optional_param('username', '', PARAM_RAW);
         $this->password = optional_param('password', '', PARAM_RAW);
         $this->courses4usertoken = optional_param('courses4usertoken', '', PARAM_RAW);
 
-        if (!empty($this->username) && !empty($this->password)) {
+        $this->login();
 
-            $SESSION->{$this->sessname} = $this->username.'|'.$this->password;
+    }
 
-            if (!empty($this->courses4usertoken)){
-                $SESSION->{$this->sessname}.= '|'.$this->courses4usertoken;
-            }
-        } else {
-            if (!empty($SESSION->{$this->sessname})) {
-              list($this->username, $this->password, $this->courses4usertoken) = explode('|', $SESSION->{$this->sessname});
-            }
+    private function login(){
+
+        global $SESSION, $USER;
+
+
+        if ($this->manual == 0){    //In automatic mode use current user's username
+            $this->username = $USER->username;
+        }
+
+        if (!has_capability('moodle/site:config', context_system::instance())){ //Make sure no one hacked to get another user's courses. ONLY ADMIN can fill in a value here!
+            $this->courses4usertoken = '';
         }
 
 
+        if (empty($SESSION->{$this->sessname})){ //NEW USER
+
+            if (empty($this->password) && $this->manual == 1){
+                return;
+            }
+
+            if (!empty($this->username)) {
+
+                $SESSION->{$this->sessname} = $this->username;
+
+                if (!empty($this->password)){
+                    $SESSION->{$this->sessname}.= '|'.$this->password;
+                }
+                else {
+                    $SESSION->{$this->sessname}.= '|';
+                }
+
+                if (!empty($this->courses4usertoken)){
+                    $SESSION->{$this->sessname}.= '|'.$this->courses4usertoken;
+                }
+            }
+        }
+        else {  //RETURNING USER
+
+            $params = explode('|', $SESSION->{$this->sessname});
+
+            $this->username = $params[0];
+
+            if (sizeof($params) >= 2){
+                $this->password = $params[1];
+            }
+
+            if (sizeof($params) == 3){
+                $this->courses4usertoken = $params[2];
+            }
+        }
     }
+
 
     public function check_login() {
         global $SESSION;
@@ -115,8 +157,8 @@ class repository_moodle19 extends repository {
         //$this->usertoken = optional_param('usertoken', '', PARAM_RAW);
 
         $strdownload = get_string('download', 'repository');
-        $strname     = get_string('rename', 'repository_moodle19');
-        $strmoodle19 = get_string('moodle19', 'repository_moodle19');
+        //$strname     = get_string('rename', 'repository_moodle19');
+        //$strmoodle19 = get_string('moodle19', 'repository_moodle19');
 
         if ($this->options['ajax']) {
 
@@ -125,28 +167,37 @@ class repository_moodle19 extends repository {
             $courses4usertoken = new stdClass();
 
             if ( has_capability('moodle/site:config', context_system::instance()) ) {
-                $user->label = 'Authenticate with Username: ';
-                $user->type = 'text';
-                $user->value = $USER->username; // Admin user can change username, manually
-                $user->id   = 'username';
-                $user->name = 'username';
+                $ret['login'] = array();
+                if ($this->manual == 1){
 
-                $password->label = 'Password: ';
-                $password->type = 'password';
-                $password->value = ''; // Admin user can change username, manually
-                $password->id = 'password';
-                $password->name = 'password';
+                    $user->label = 'Authenticate with Username: ';
+                    $user->type = 'text';
+                    $user->value = $USER->username; // Admin user can change username, manually
+                    $user->id   = 'username';
+                    $user->name = 'username';
 
-                $courses4usertoken->label = 'Request courses for user';
+                    $password->label = 'Password: ';
+                    $password->type = 'password';
+                    $password->value = ''; // Admin user can change username, manually
+                    $password->id = 'password';
+                    $password->name = 'password';
+
+                    $ret['login'][] = $user;
+                    $ret['login'][] = $password;
+                }
+
+
+                $courses4usertoken->label = 'Request courses for user (Leave empty to restore for yourself): ';
                 $courses4usertoken->type = 'text';
                 $courses4usertoken->value = '';
                 $courses4usertoken->name = 'courses4usertoken';
                 $courses4usertoken->id = 'courses4usertoken';
 
-                $ret['login'] = array($user,$password,$courses4usertoken);
+                $ret['login'][] = $courses4usertoken;
 
-            } else {
-                if ($this->manual==1) {
+
+            } else {    //Not ADMIN
+                if ($this->manual==1) { //Manual user matching mode. Require USER+PASSWORD
                     // User (Teacher) can use different credentials
                     // to login into a different Moodle 19 system
                     $user->label = 'Username: ';
@@ -161,41 +212,10 @@ class repository_moodle19 extends repository {
                     $password->id = 'password';
                     $password->name = 'password';
 
-                    // courses4usertoken will be using user->value
-                    // Only Admin is allowed to use different courses4usertoken
-                    $courses4usertoken->label = '.';
-                    $courses4usertoken->type = 'hidden';
-                    $courses4usertoken->value = $USER->username;
-                    $courses4usertoken->name = 'courses4usertoken';
-                    $courses4usertoken->id = 'courses4usertoken';
+                    $ret['login'] = array($user,$password);
 
-                    $ret['login'] = array($user,$password,$courses4usertoken);
-
-                } else {
-                    // User (Teacher) is using same credentials
-                    // to login into a different Moodle 19 system
-
-                    $user->label = 'Username: using logged-in username';
-                    $user->type = 'hidden';
-                    $user->value = $USER->username;
-                    $user->name = 'username';
-
-                    $password->label = 'Password: using logged-in password';
-                    $password->type = 'hidden'; // Admin user can change username, manually
-                    $password->value = $USER->password;
-                    $password->id = 'password';
-                    $password->name = 'password';
-
-                    // courses4usertoken will be using user->value
-                    // Only Admin is allowed to use different courses4usertoken
-                    $courses4usertoken->label = '.';
-                    $courses4usertoken->type = 'hidden';
-                    $courses4usertoken->value = $USER->username;
-                    $courses4usertoken->name = 'courses4usertoken';
-                    $courses4usertoken->id = 'courses4usertoken';
-
-                    $ret['login'] = array($user,$password,$courses4usertoken);
-
+                } else {    //Not admin, automatic user matching mode. Do not require anything to login.
+                    $ret['login'] = array();
                 }
 
             }
@@ -281,6 +301,7 @@ EOD;
         $result = $this->curl_post($this->ws_endpoint_url,array('request'=>urlencode(base64_encode($this->iv.$data))));
 
         if ($result->status_code != 200){   //Print error to enable debugging
+            $this->logout();
             print_r($result->data);
         }
         else {
@@ -316,7 +337,7 @@ EOD;
      */
     public function get_listing($path='', $page='') {
         $backupfiles = array();
-        $backupfiles['path'] = $this->get_navbar($path, $this->courses4usertoken);
+        $backupfiles['path'] = $this->get_navbar($path);
         $backupfiles['list'] = $this->get_list($path);
         $backupfiles['dynload'] = true;
         $backupfiles['nologin'] = false;
@@ -338,6 +359,10 @@ EOD;
 
 
         $remote_list = $this->get_remote_data($type, $id, 'list');
+
+        if (empty($remote_list)){
+            return $list;
+        }
 
         foreach ($remote_list as $entry) {
             if ($entry->type == 'course'){
@@ -374,9 +399,9 @@ EOD;
     }
 
     // generate repository course navigation PATH
-    private function get_navbar($path='', $username) {
+    private function get_navbar($path='') {
 
-        $nav_bar = array(array('name' => $username, 'path' => ''));
+        $nav_bar = array(array('name' => empty($this->courses4usertoken) ? $this->username : $this->courses4usertoken, 'path' => ''));
 
         $id = $type = null;
 
@@ -388,6 +413,10 @@ EOD;
         }
 
         $list = $this->get_remote_data($type, $id, 'navbar');
+
+        if (empty($list)){
+            return $nav_bar;
+        }
 
 
         foreach($list as $navbar_entry){
@@ -429,7 +458,7 @@ EOD;
         // Admin can enable "manual" mode, in which the user (Teacher) can use a different username and password
         // (In case the same users has different user credentials on both systems)
         $mform->addElement('checkbox', 'manual', get_string('manual', 'repository_moodle19'));
-        //$mform->setDefault('manual', false);
+        $mform->setDefault('manual', false);
 
         $strrequired = get_string('required');
         $mform->addRule('moodle19server', $strrequired, 'required', null, 'client');
