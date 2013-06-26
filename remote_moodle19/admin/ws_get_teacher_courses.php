@@ -88,6 +88,7 @@ switch ($request->action){
 
             $categories_list = prepare_category_list($request->id);
             $course_list  = prepare_course_list($teacher, $request->id);
+            //handle_error('debug request=', print_r($request).print_r($course_list));
 
             $list = array_merge($categories_list, $course_list);
             //handle_error($course_list, 500);
@@ -224,7 +225,7 @@ function authenticate_and_get_user($request){
 }
 
 function prepare_course_list($teacher, $category){
-    $sql_mycourses = "SELECT c.id as id, c.fullname as fullname
+    $sql_mycourses = "SELECT c.id as id, c.fullname as fullname, c.visible as visible
                     FROM mdl_role_assignments AS ra
                     JOIN mdl_context AS context ON ra.contextid = context.id AND context.contextlevel = 50
                     JOIN mdl_course AS c ON context.instanceid = c.id
@@ -234,13 +235,14 @@ function prepare_course_list($teacher, $category){
 
 
     $list = array();
+    //handle_error(get_records_sql($sql_mycourses ),500);
     if ($mycourses = get_records_sql($sql_mycourses )) {
         foreach ($mycourses as $mycourse ) {
             $course = new stdClass();
             $course->id = $mycourse->id;
             $course->name = $mycourse->fullname;
             $course->type = 'course';
-            $course->hidden = !$course->visible;
+            $course->hidden = ($mycourse->visible == 0) ? 1 : 0;
 
             $list[] = $course;
         }

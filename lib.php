@@ -387,9 +387,9 @@ EOD;
     }
 
     private function build_course_entry($entry){
+        global $OUTPUT;
 
-
-       return  array('title'=>$entry->name, 'path' => 'course|'.$entry->id, 'children'=>array());
+       return  array('title'=>$entry->name, 'path' => 'course|'.$entry->id, 'children'=>array(), 'icon' => $OUTPUT->pix_url('f/moodle-24','core')->out(false));
     }
 
     private function build_backupfile_entry($entry, $courseid){
