@@ -1,3 +1,5 @@
+
+
 Overview
 ========
 Allow teachers to easily restore backup courses from Moodle 1.9 to Moodle 2+ systems
@@ -6,6 +8,10 @@ And allow him/her to choose one to be silently copied over the network and resto
 system he/she was using this repository from.
 
 The process is relatively secured by a secret key the administrator of both system has to setup initially.
+
+Prerequisites
+=============
+1. This plugin requires php-mcrypt to be installed on both server in order for it to work.
 
 Install
 =======
@@ -33,4 +39,13 @@ Navigate to the Moodle 2 frontpage
 For support and feedback, please contact Nadav Kavalerchik, nadavkav@gmail.com or Nitzan Bar nitzanbar@macam.ac.il
 Updated version can be found @ https://github.com/mofet/repository_moodle19
 
+NOTES
+=====
+1. For large backup files timeouts could be encountered. You can raise max_exectution_time in php.ini to resolve this.
+
+CREDITS
+=======
+This plugin was written by MOFET institute http://www.mofet.macam.ac.il/eng
+
 Enjoy :-)
+

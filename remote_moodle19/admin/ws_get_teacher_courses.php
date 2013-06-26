@@ -21,6 +21,7 @@
  * @package    repository_moodle19
  * @copyright  2013 Nadav Kavalerchik {@link http://github.com/nadavkav}
  * @copyright  2013 Nitzan Bar {@link http://github.com/nitzo}
+ * @copyright  2013 MOFET INSTITUTE {@link http://www.mofet.macam.ac.il/eng}
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 

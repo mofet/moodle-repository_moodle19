@@ -22,6 +22,7 @@
  * @package    repository_moodle19
  * @copyright  2013 Nadav Kavalerchik {@link http://github.com/nadavkav}
  * @copyright  2013 Nitzan Bar {@link http://github.com/nitzo}
+ * @copyright  2013 MOFET INSTITUTE {@link http://www.mofet.macam.ac.il/eng}
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 require_once($CFG->dirroot . '/repository/lib.php');
@@ -35,14 +36,16 @@ require_once($CFG->dirroot . '/repository/lib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class repository_moodle19 extends repository {
-    private $courselist = array();
+
     private $secret = null;
     private $manual = false;
     private $username;
     private $password;
     private $courses4usertoken;
-    private $iv;
-    private $iv_base64;
+
+    private static $iv;
+
+
 
     /**
      * @param int $repositoryid
@@ -56,12 +59,6 @@ class repository_moodle19 extends repository {
 
         // The following mathematical calculation takes "long" time so we do it once
         // It safe enough not to redo it for every WS connection we open to the Moodle 19 server
-
-        // create a random IV to use with CBC encoding
-        // mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC) = 32
-        $iv_size = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC); // =32
-        $this->iv = mcrypt_create_iv($iv_size);
-        $this->iv_base64 = base64_encode($this->iv);
 
         //$this->moodle19sever = 'http://localhost/moodle-macam/moodle/';
         $moodle19server = get_config('moodle19', 'moodle19server');
@@ -81,6 +78,15 @@ class repository_moodle19 extends repository {
         $this->courses4usertoken = optional_param('courses4usertoken', '', PARAM_RAW);
 
         $this->login();
+
+    }
+
+    public static function init(){
+        // create a random IV to use with CBC encoding
+        // mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC) = 32
+        $iv_size = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC); // =32
+
+        self::$iv = mcrypt_create_iv($iv_size, MCRYPT_DEV_URANDOM);
 
     }
 
@@ -296,9 +302,9 @@ EOD;
 
         $base64_json_request = base64_encode(json_encode($fields));
 
-        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,$this->iv);
+        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,self::$iv);
 
-        $result = $this->curl_post($this->ws_endpoint_url,array('request'=>urlencode(base64_encode($this->iv.$data))));
+        $result = $this->curl_post($this->ws_endpoint_url,array('request'=>urlencode(base64_encode(self::$iv.$data))));
 
         if ($result->status_code != 200){   //Print error to enable debugging
             $this->logout();
@@ -312,7 +318,7 @@ EOD;
 
 
     public function get_file($url, $filename=""){
-
+        set_time_limit(0);
         $fields = array(
           'action' => 'download',
           'username' => $this->username,
@@ -323,9 +329,9 @@ EOD;
 
         $base64_json_request = base64_encode(json_encode($fields));
 
-        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,$this->iv);
+        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,self::$iv);
 
-        $url = $this->ws_endpoint_url.'?request='.urlencode(base64_encode($this->iv.$data));
+        $url = $this->ws_endpoint_url.'?request='.urlencode(base64_encode(self::$iv.$data));
 
         return parent::get_file($url, $filename);
     }
@@ -465,4 +471,6 @@ EOD;
         $mform->addRule('secret', $strrequired, 'required', null, 'client');
     }
 }
+
+repository_moodle19::init();
 
