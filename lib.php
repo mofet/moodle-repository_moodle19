@@ -75,7 +75,9 @@ class repository_moodle19 extends repository {
         //Deal with user logging in
         $this->username = optional_param('username', '', PARAM_RAW);
         $this->password = optional_param('password', '', PARAM_RAW);
+
         $this->courses4usertoken = optional_param('courses4usertoken', '', PARAM_RAW);
+
 
         $this->login();
 
@@ -84,9 +86,14 @@ class repository_moodle19 extends repository {
     public static function init(){
         // create a random IV to use with CBC encoding
         // mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC) = 32
-        $iv_size = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC); // =32
 
-        self::$iv = mcrypt_create_iv($iv_size, MCRYPT_DEV_URANDOM);
+        if (extension_loaded('mcrypt')){
+            $iv_size = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC); // =32
+
+            self::$iv = mcrypt_create_iv($iv_size, MCRYPT_DEV_URANDOM);
+        }
+
+
 
     }
 
@@ -342,6 +349,11 @@ EOD;
      * @return array
      */
     public function get_listing($path='', $page='') {
+
+        if (!extension_loaded('mcrypt')){
+            return array();
+        }
+
         $backupfiles = array();
         $backupfiles['path'] = $this->get_navbar($path);
         $backupfiles['list'] = $this->get_list($path);
@@ -378,7 +390,11 @@ EOD;
                 $list[] = $this->build_category_entry($entry);
             }
             else if ($entry->type == 'backup_file'){
-                $list[] = $this->build_backupfile_entry($entry, $id);
+                //Show only zip files in root directory
+                if (strpos($entry->name,'.zip') > 0 && strpos($entry->name, '/') == false){
+                    $list[] = $this->build_backupfile_entry($entry, $id);
+                }
+
             }
             else {
                 continue;
