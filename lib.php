@@ -87,7 +87,7 @@ class repository_moodle19 extends repository {
         // create a random IV to use with CBC encoding
         // mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC) = 32
 
-        if (extension_loaded('mcrypt')){
+        if (extension_loaded('mcrypt') && self::$iv == null){
             $iv_size = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC); // =32
 
             self::$iv = mcrypt_create_iv($iv_size, MCRYPT_DEV_URANDOM);
@@ -108,6 +108,11 @@ class repository_moodle19 extends repository {
 
         if (!has_capability('moodle/site:config', context_system::instance())){ //Make sure no one hacked to get another user's courses. ONLY ADMIN can fill in a value here!
             $this->courses4usertoken = '';
+        }
+
+        //Do not log-in ADMIN users automatically
+        if (has_capability('moodle/site:config', context_system::instance()) && (optional_param('submitted', 'false', PARAM_RAW) == 'false')){
+           return;
         }
 
 
@@ -206,7 +211,15 @@ class repository_moodle19 extends repository {
                 $courses4usertoken->name = 'courses4usertoken';
                 $courses4usertoken->id = 'courses4usertoken';
 
+                $submitted = new stdClass();
+                $submitted->type = 'hidden';
+                $submitted->value = true;
+                $submitted->name = 'submitted';
+                $submitted->id = 'submitted';
+
+
                 $ret['login'][] = $courses4usertoken;
+                $ret['login'][] = $submitted;
 
 
             } else {    //Not ADMIN
