@@ -83,18 +83,29 @@ class repository_moodle19 extends repository {
 
     }
 
-    public static function init(){
+    private function initIV(){
         // create a random IV to use with CBC encoding
         // mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC) = 32
+        global $SESSION;
 
-        if (extension_loaded('mcrypt') && self::$iv == null){
+        $key = $this->sessname.'_iv';
+
+        if (extension_loaded('mcrypt') && empty($SESSION->{$key})){
             $iv_size = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC); // =32
-
-            self::$iv = mcrypt_create_iv($iv_size, MCRYPT_DEV_URANDOM);
+            $SESSION->{$key} = mcrypt_create_iv($iv_size, MCRYPT_DEV_URANDOM);
         }
+    }
 
+    private function getIV(){
+        global $SESSION;
 
+        $key = $this->sessname.'_iv';
 
+        if (empty($SESSION->{$key})){
+            $this->initIV();
+
+        }
+           return $SESSION->{$key};
     }
 
     private function login(){
@@ -322,9 +333,9 @@ EOD;
 
         $base64_json_request = base64_encode(json_encode($fields));
 
-        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,self::$iv);
+        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,$this->getIV());
 
-        $result = $this->curl_post($this->ws_endpoint_url,array('request'=>urlencode(base64_encode(self::$iv.$data))));
+        $result = $this->curl_post($this->ws_endpoint_url,array('request'=>urlencode(base64_encode($this->getIV().$data))));
 
         if ($result->status_code != 200){   //Print error to enable debugging
             $this->logout();
@@ -349,9 +360,9 @@ EOD;
 
         $base64_json_request = base64_encode(json_encode($fields));
 
-        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,self::$iv);
+        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,$this->getIV());
 
-        $url = $this->ws_endpoint_url.'?request='.urlencode(base64_encode(self::$iv.$data));
+        $url = $this->ws_endpoint_url.'?request='.urlencode(base64_encode($this->getIV().$data));
 
         return parent::get_file($url, $filename);
     }
@@ -501,5 +512,4 @@ EOD;
     }
 }
 
-repository_moodle19::init();
 
