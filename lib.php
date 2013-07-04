@@ -110,13 +110,13 @@ class repository_moodle19 extends repository {
             $this->courses4usertoken = '';
         }
 
-        //Do not log-in ADMIN users automatically
-        if (has_capability('moodle/site:config', context_system::instance()) && (optional_param('submitted', 'false', PARAM_RAW) == 'false')){
-           return;
-        }
-
 
         if (empty($SESSION->{$this->sessname})){ //NEW USER
+
+            //Do not log-in ADMIN users automatically
+            if (has_capability('moodle/site:config', context_system::instance()) && (optional_param('submitted', 'false', PARAM_RAW) == 'false')){
+                return;
+            }
 
             if (empty($this->password) && $this->manual == 1){
                 return;
