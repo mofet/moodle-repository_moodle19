@@ -292,7 +292,7 @@ EOD;
             CURLOPT_FRESH_CONNECT => 1,
             CURLOPT_RETURNTRANSFER => 1,
             CURLOPT_FORBID_REUSE => 1,
-            CURLOPT_TIMEOUT => 4,
+            CURLOPT_TIMEOUT => 15,
             CURLOPT_POSTFIELDS => http_build_query($post)
         );
 
