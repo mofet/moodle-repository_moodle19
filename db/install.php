@@ -1,4 +1,5 @@
 <?php
+
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -32,7 +33,7 @@ function xmldb_repository_moodle19_install() {
     $result = true;
     require_once($CFG->dirroot.'/repository/lib.php');
     $moodle19plugin = new repository_type('moodle19', array(), true);
-    if(!$id = $moodle19plugin->create(true)) {
+    if (!$id = $moodle19plugin->create(true)) {
         $result = false;
     }
     return $result;

@@ -1,4 +1,5 @@
 <?php
+
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -24,19 +25,13 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-//if ($hassiteconfig){
-
     $temp = new admin_settingpage('course_export_ws', 'Course Export Webservice');
 
-    // Set Moodle2 secret for connecting Moodle2 repository "Moodle19 Import" plugin to this Moodle
+    // Set Moodle2 secret for connecting Moodle2 repository "Moodle19 Import" plugin to this Moodle.
     $temp->add(new admin_setting_configtext('moodle2secret', 'Export Webservice secret', 'Export Webservice Secret. This should match in Moodle2 or any other server that is using this service. KEEP THIS SAFE!', 'secret'));
-
 
     $temp->add(new admin_setting_configcheckbox('repository_moodle19_require_user_password', 'Require password', 'When a remote server requests data from this server only serve content if username and password are present in request and they match local user\'s password' ,true, true, false));
 
-
     $temp->add(new admin_setting_configcheckbox('repository_moodle19_allow_restore_onbehalf', 'Request on behalf', 'Allow remote server to request data on behalf of other users. No password validation is done. NOTE: When require password is off other server can request any course data with no validation! Use with care!', false, true, false));
 
-
     $ADMIN->add('mnet', $temp);
-//}

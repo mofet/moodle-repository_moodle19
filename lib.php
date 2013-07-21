@@ -45,24 +45,14 @@ class repository_moodle19 extends repository {
 
     private static $iv;
 
-
-
-    /**
-     * @param int $repositoryid
-     * @param object $context
-     * @param array $options
-     */
-    public function __construct($repositoryid, $context = SYSCONTEXTID, $options = array()){
+    public function __construct($repositoryid, $context = SYSCONTEXTID, $options = array(), $readonly = 0) {
         parent::__construct($repositoryid, $context, $options);
 
-
-
         // The following mathematical calculation takes "long" time so we do it once
-        // It safe enough not to redo it for every WS connection we open to the Moodle 19 server
+        // It safe enough not to redo it for every WS connection we open to the Moodle 19 server.
 
-        //$this->moodle19sever = 'http://localhost/moodle-macam/moodle/';
         $moodle19server = get_config('moodle19', 'moodle19server');
-        if (stripos(strrev($moodle19server), '/') !== 0){
+        if (stripos(strrev($moodle19server), '/') !== 0) {
             $moodle19server.='/';
         }
         $this->ws_endpoint_url = $moodle19server.'admin/ws_get_teacher_courses.php';
@@ -72,7 +62,7 @@ class repository_moodle19 extends repository {
 
         $this->sessname = 'repository_moodle19';
 
-        //Deal with user logging in
+        // Deal with user logging in.
         $this->username = optional_param('username', '', PARAM_RAW);
         $this->password = optional_param('password', '', PARAM_RAW);
 
@@ -83,42 +73,55 @@ class repository_moodle19 extends repository {
 
     }
 
-    public static function init(){
-        // create a random IV to use with CBC encoding
+    private function initiv() {
+        // Create a random IV to use with CBC encoding.
         // mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC) = 32
+        global $SESSION;
 
-        if (extension_loaded('mcrypt') && self::$iv == null){
-            $iv_size = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC); // =32
+        $key = $this->sessname.'_iv';
 
-            self::$iv = mcrypt_create_iv($iv_size, MCRYPT_DEV_URANDOM);
+        if (extension_loaded('mcrypt') && empty($SESSION->{$key})) {
+            $ivsize = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC);
+            $SESSION->{$key} = mcrypt_create_iv($ivsize, MCRYPT_DEV_URANDOM);
         }
-
-
-
     }
 
-    private function login(){
+    private function getiv() {
+        global $SESSION;
+
+        $key = $this->sessname.'_iv';
+
+        if (empty($SESSION->{$key})) {
+            $this->initiv();
+
+        }
+           return $SESSION->{$key};
+    }
+
+    private function login() {
 
         global $SESSION, $USER;
 
-
-        if ($this->manual == 0){    //In automatic mode use current user's username
+        // In automatic mode use current user's username.
+        if ($this->manual == 0) {
             $this->username = $USER->username;
         }
 
-        if (!has_capability('moodle/site:config', context_system::instance())){ //Make sure no one hacked to get another user's courses. ONLY ADMIN can fill in a value here!
+        // Make sure no one hacked to get another user's courses. ONLY ADMIN can fill in a value here!
+        if (!has_capability('moodle/site:config', context_system::instance())) {
             $this->courses4usertoken = '';
         }
 
-        //Do not log-in ADMIN users automatically
-        if (has_capability('moodle/site:config', context_system::instance()) && (optional_param('submitted', 'false', PARAM_RAW) == 'false')){
-           return;
-        }
+        // NEW USER.
+        if (empty($SESSION->{$this->sessname})) {
 
+            // Do not log-in ADMIN users automatically.
+            if (has_capability('moodle/site:config', context_system::instance()) &&
+                (optional_param('submitted', 'false', PARAM_RAW) == 'false')) {
+                return;
+            }
 
-        if (empty($SESSION->{$this->sessname})){ //NEW USER
-
-            if (empty($this->password) && $this->manual == 1){
+            if (empty($this->password) && $this->manual == 1) {
                 return;
             }
 
@@ -126,29 +129,26 @@ class repository_moodle19 extends repository {
 
                 $SESSION->{$this->sessname} = $this->username;
 
-                if (!empty($this->password)){
+                if (!empty($this->password)) {
                     $SESSION->{$this->sessname}.= '|'.$this->password;
-                }
-                else {
+                } else {
                     $SESSION->{$this->sessname}.= '|';
                 }
 
-                if (!empty($this->courses4usertoken)){
+                if (!empty($this->courses4usertoken)) {
                     $SESSION->{$this->sessname}.= '|'.$this->courses4usertoken;
                 }
             }
-        }
-        else {  //RETURNING USER
-
+        } else {
+            // RETURNING USER.
             $params = explode('|', $SESSION->{$this->sessname});
-
             $this->username = $params[0];
 
-            if (sizeof($params) >= 2){
+            if (count($params) >= 2) {
                 $this->password = $params[1];
             }
 
-            if (sizeof($params) == 3){
+            if (count($params) == 3) {
                 $this->courses4usertoken = $params[2];
             }
         }
@@ -160,7 +160,7 @@ class repository_moodle19 extends repository {
         return !empty($SESSION->{$this->sessname});
     }
 
-    public function logout(){
+    public function logout() {
         global $SESSION;
         unset($SESSION->{$this->sessname});
         return $this->print_login();
@@ -172,11 +172,7 @@ class repository_moodle19 extends repository {
     public function print_login() {
         global $USER;
 
-        //$this->usertoken = optional_param('usertoken', '', PARAM_RAW);
-
         $strdownload = get_string('download', 'repository');
-        //$strname     = get_string('rename', 'repository_moodle19');
-        //$strmoodle19 = get_string('moodle19', 'repository_moodle19');
 
         if ($this->options['ajax']) {
 
@@ -186,24 +182,23 @@ class repository_moodle19 extends repository {
 
             if ( has_capability('moodle/site:config', context_system::instance()) ) {
                 $ret['login'] = array();
-                if ($this->manual == 1){
+                if ($this->manual == 1) {
 
                     $user->label = 'Authenticate with Username: ';
                     $user->type = 'text';
-                    $user->value = $USER->username; // Admin user can change username, manually
+                    $user->value = $USER->username; // Admin user can change username, manually.
                     $user->id   = 'username';
                     $user->name = 'username';
 
                     $password->label = 'Password: ';
                     $password->type = 'password';
-                    $password->value = ''; // Admin user can change username, manually
+                    $password->value = ''; // Admin user can set password, manually.
                     $password->id = 'password';
                     $password->name = 'password';
 
                     $ret['login'][] = $user;
                     $ret['login'][] = $password;
                 }
-
 
                 $courses4usertoken->label = 'Request courses for user (Leave empty to restore for yourself): ';
                 $courses4usertoken->type = 'text';
@@ -217,15 +212,15 @@ class repository_moodle19 extends repository {
                 $submitted->name = 'submitted';
                 $submitted->id = 'submitted';
 
-
                 $ret['login'][] = $courses4usertoken;
                 $ret['login'][] = $submitted;
 
-
-            } else {    //Not ADMIN
-                if ($this->manual==1) { //Manual user matching mode. Require USER+PASSWORD
+            } else {
+                // Not ADMIN.
+                if ($this->manual==1) {
+                    // Manual user matching mode. Require USER+PASSWORD.
                     // User (Teacher) can use different credentials
-                    // to login into a different Moodle 19 system
+                    // to login into a different Moodle 19 system.
                     $user->label = 'Username: ';
                     $user->type = 'text';
                     $user->value = $USER->username;
@@ -238,17 +233,17 @@ class repository_moodle19 extends repository {
                     $password->id = 'password';
                     $password->name = 'password';
 
-                    $ret['login'] = array($user,$password);
+                    $ret['login'] = array($user, $password);
 
-                } else {    //Not admin, automatic user matching mode. Do not require anything to login.
+                } else {    // Not admin, automatic user matching mode. Do not require anything to login.
                     $ret['login'] = array();
                 }
-
             }
 
             $ret['login_btn_label'] = get_string('listcoursesandfiles', 'repository_moodle19');
 
-            //$ret['allowcaching'] = true; // indicates that login form can be cached in filepicker.js
+            // Indicates that login form can be cached in filepicker.js
+            // $ret['allowcaching'] = true;
             return $ret;
         } else {
             // Not implemented!!!
@@ -266,14 +261,13 @@ EOD;
     }
 
     /**
-     * Send a POST requst using cURL
+     * Send a POST request using cURL
      * @param string $url to request
      * @param array $post values to send
      * @param array $options for cURL
      * @return string
      */
-    function curl_post($url, array $post = NULL, array $options = array())
-    {
+    private function curl_post($url, array $post = null, array $options = array()) {
         $defaults = array(
             CURLOPT_POST => 1,
             CURLOPT_HEADER => 0,
@@ -281,21 +275,20 @@ EOD;
             CURLOPT_FRESH_CONNECT => 1,
             CURLOPT_RETURNTRANSFER => 1,
             CURLOPT_FORBID_REUSE => 1,
-            CURLOPT_TIMEOUT => 4,
+            CURLOPT_TIMEOUT => 15,
             CURLOPT_POSTFIELDS => http_build_query($post)
         );
 
         $ch = curl_init();
         curl_setopt_array($ch, ($options + $defaults));
-        if(($result = curl_exec($ch)) === false)
-        {
+        if (($result = curl_exec($ch)) === false) {
             trigger_error(curl_error($ch));
         }
 
         $response = new stdClass();
-        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $httpstatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-        $response->status_code = $http_status;
+        $response->status_code = $httpstatus;
         $response->data = $result;
 
         curl_close($ch);
@@ -304,6 +297,9 @@ EOD;
 
 
     /**
+     * @param $type - course or category
+     * @param $id - ID for the selected type
+     * @param action - dwonload, list, navbar
      * @return array of user's courses and list of backup files within each course
      */
     private function get_remote_data($type, $id, $action) {
@@ -315,29 +311,36 @@ EOD;
             'courses4usertoken' => $this->courses4usertoken
         );
 
-        if (isset($type) && isset($id)){
+        if (isset($type) && isset($id)) {
             $fields['type'] = $type;
             $fields['id'] = $id;
         }
 
-        $base64_json_request = base64_encode(json_encode($fields));
+        $base64jsonrequest = base64_encode(json_encode($fields));
 
-        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,self::$iv);
+        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret), $base64jsonrequest, MCRYPT_MODE_CBC, $this->getiv());
 
-        $result = $this->curl_post($this->ws_endpoint_url,array('request'=>urlencode(base64_encode(self::$iv.$data))));
+        $result = $this->curl_post($this->ws_endpoint_url, array('request'=>urlencode(base64_encode($this->getiv().$data))));
 
-        if ($result->status_code != 200){   //Print error to enable debugging
+        // Print error to enable debugging.
+        if ($result->status_code != 200) {
             $this->logout();
-            print_r($result->data);
-        }
-        else {
+            // DEBUG: print_r($result->data);
+        } else {
            return json_decode($result->data);
         }
     }
 
-
-
-    public function get_file($url, $filename=""){
+    /*
+    * @param string $url the content of files.reference field, in this implementaion
+    * it is asssumed that it contains the string with URL of the file
+    * @param string $filename filename (without path) to save the downloaded file in the
+    * temporary directory, if omitted or file already exists the new filename will be generated
+    * @return array with elements:
+    *   path: internal location of the file
+    *   url: URL to the source (from parameters)
+    */
+    public function get_file($url, $filename="") {
         set_time_limit(0);
         $fields = array(
           'action' => 'download',
@@ -347,23 +350,23 @@ EOD;
           'file' => $url
         );
 
-        $base64_json_request = base64_encode(json_encode($fields));
+        $base64jsonrequest = base64_encode(json_encode($fields));
 
-        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret),$base64_json_request, MCRYPT_MODE_CBC,self::$iv);
+        $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret), $base64jsonrequest, MCRYPT_MODE_CBC, $this->getiv());
 
-        $url = $this->ws_endpoint_url.'?request='.urlencode(base64_encode(self::$iv.$data));
+        $url = $this->ws_endpoint_url.'?request='.urlencode(base64_encode($this->getiv().$data));
 
         return parent::get_file($url, $filename);
     }
 
     /**
-     * @param mixed $path
-     * @param string $search
-     * @return array
+     * @param string $path this parameter can a folder name, or a identification of folder
+     * @param string $page the page number of file list
+     * @return array the list of files, including meta infomation, containing the following keys
      */
     public function get_listing($path='', $page='') {
 
-        if (!extension_loaded('mcrypt')){
+        if (!extension_loaded('mcrypt')) {
             return array();
         }
 
@@ -384,80 +387,73 @@ EOD;
         $id = $type = null;
         $list = array();
 
-        if (isset($path) && !empty($path)){
+        if (isset($path) && !empty($path)) {
             list($type, $id) = explode('|', $path);
         }
 
+        $remotelist = $this->get_remote_data($type, $id, 'list');
 
-        $remote_list = $this->get_remote_data($type, $id, 'list');
-
-        if (empty($remote_list)){
+        if (empty($remotelist)) {
             return $list;
         }
 
-        foreach ($remote_list as $entry) {
-            if ($entry->type == 'course'){
+        foreach ($remotelist as $entry) {
+            if ($entry->type == 'course') {
                 $list[] =  $this->build_course_entry($entry);
-            }
-            else if ($entry->type == 'category'){
+            } else if ($entry->type == 'category') {
                 $list[] = $this->build_category_entry($entry);
-            }
-            else if ($entry->type == 'backup_file'){
-                //Show only zip files in root directory
-                if (strpos($entry->name,'.zip') > 0 && strpos($entry->name, '/') == false){
+            } else if ($entry->type == 'backup_file') {
+                // Show only zip files in root directory.
+                if (strpos($entry->name, '.zip') > 0 && strpos($entry->name, '/') == false) {
                     $list[] = $this->build_backupfile_entry($entry, $id);
                 }
-
-            }
-            else {
+            } else {
                 continue;
             }
-
         }
         return $list;
     }
 
-    private function build_category_entry($entry){
+    private function build_category_entry($entry) {
         return array('title' => $entry->name, 'path' => 'category|'.$entry->id, 'children' => array());
     }
 
-    private function build_course_entry($entry){
+    private function build_course_entry($entry) {
         global $OUTPUT;
 
-       return  array('title'=>$entry->name, 'path' => 'course|'.$entry->id, 'children'=>array(), 'icon' => $OUTPUT->pix_url('f/moodle-24','core')->out(false));
+        return  array('title'=>$entry->name, 'path'=>'course|'.$entry->id, 'children'=>array(),
+                        'icon' => $OUTPUT->pix_url('f/moodle-24', 'core')->out(false));
     }
 
-    private function build_backupfile_entry($entry, $courseid){
+    private function build_backupfile_entry($entry, $courseid) {
         $source = $courseid.'|'.$entry->name;
         return array('title'=> $entry->name, 'date' => $entry->date, 'size' => $entry->size, 'source' => $source);
-
     }
 
-    // generate repository course navigation PATH
+    // Generate repository course navigation PATH.
     private function get_navbar($path='') {
 
-        $nav_bar = array(array('name' => empty($this->courses4usertoken) ? $this->username : $this->courses4usertoken, 'path' => ''));
+        $navbar = array(array('name'=>empty($this->courses4usertoken) ? $this->username : $this->courses4usertoken, 'path' => ''));
 
+        // TODO: Nitzan, do we need this?
         $id = $type = null;
 
-        if (isset($path) && !empty($path)){
+        if (isset($path) && !empty($path)) {
             list($type, $id) = explode('|', $path);
-        }
-        else {
-            return $nav_bar;
+        } else {
+            return $navbar;
         }
 
         $list = $this->get_remote_data($type, $id, 'navbar');
 
-        if (empty($list)){
-            return $nav_bar;
+        if (empty($list)) {
+            return $navbar;
         }
 
-
-        foreach($list as $navbar_entry){
-            $nav_bar[] = array('name' => $navbar_entry->name, 'path' => $navbar_entry->type.'|'.$navbar_entry->id);
+        foreach ($list as $navbarentry) {
+            $navbar[] = array('name' => $navbarentry->name, 'path' => $navbarentry->type.'|'.$navbarentry->id);
         }
-        return $nav_bar;
+        return $navbar;
     }
 
     public function supported_returntypes() {
@@ -467,7 +463,7 @@ EOD;
     /**
      * Return the source information
      *
-     * @param stdClass $url
+     * @param string $url the value that repository returned in listing as 'source'
      * @return string|null
      */
     public function get_file_source_info($url) {
@@ -475,23 +471,23 @@ EOD;
     }
 
     public static function get_type_option_names() {
-        return array('moodle19server', 'secret','manual', 'pluginname');
+        return array('moodle19server', 'secret', 'manual', 'pluginname');
     }
 
     public static function type_config_form($mform, $classname = 'repository') {
 
         parent::type_config_form($mform);
-        $mform->addElement('text', 'moodle19server', get_string('moodle19server', 'repository_moodle19'),array('size'=>60));
+        $mform->addElement('text', 'moodle19server', get_string('moodle19server', 'repository_moodle19'), array('size'=>60));
         $mform->setType('moodle19server', PARAM_URL);
 
         // Secret should also be set on the Moodle 19 server side
         // navigate to http://moodle-19-server/admin/settings.php?section=experimental
-        // And set "moodle2secret"
-        $mform->addElement('text', 'secret', get_string('secret', 'repository_moodle19'),array('size'=>15));
+        // And set "moodle2secret".
+        $mform->addElement('text', 'secret', get_string('secret', 'repository_moodle19'), array('size'=>15));
         $mform->setType('secret', PARAM_RAW_TRIMMED);
 
         // Admin can enable "manual" mode, in which the user (Teacher) can use a different username and password
-        // (In case the same users has different user credentials on both systems)
+        // (In case the same users has different user credentials on both systems).
         $mform->addElement('checkbox', 'manual', get_string('manual', 'repository_moodle19'));
         $mform->setDefault('manual', false);
 
@@ -501,5 +497,4 @@ EOD;
     }
 }
 
-repository_moodle19::init();
 
