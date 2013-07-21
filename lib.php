@@ -355,8 +355,13 @@ EOD;
         $data = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($this->secret), $base64jsonrequest, MCRYPT_MODE_CBC, $this->getiv());
 
         $url = $this->ws_endpoint_url.'?request='.urlencode(base64_encode($this->getiv().$data));
-
-        return parent::get_file($url, $filename);
+        $path = $this->prepare_file($filename);
+        $c = new curl;
+        $result = $c->download_one($url, null, array('filepath' => $path, 'timeout' => 0));
+        if ($result !== true) {
+            throw new moodle_exception('errorwhiledownload', 'repository', '', $result);
+        }
+        return array('path'=>$path, 'url'=>$url);
     }
 
     /**
