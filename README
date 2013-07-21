@@ -2,16 +2,16 @@
 
 Overview
 ========
-Allow teachers to easily restore backup courses from Moodle 1.9 to Moodle 2+ systems
-This repository uses the user's ID (username) to get a list of backup courses a user has on the Moodle 1.9 system
-And allow him/her to choose one to be silently copied over the network and restored into the current Moodle 2+
-system he/she was using this repository from.
+Allow teachers to easily restore (Import) backup courses from Moodle 1.9 to Moodle 2+ systems.
+This repository uses the user's ID (username) to get a list of backup courses a user has on the Moodle 1.9 system.
+And allow him/her to choose one course at a time, to be securely copied over the network
+and restored into the current Moodle 2+ system he/she was using this repository from.
 
 The process is relatively secured by a secret key the administrator of both system has to setup initially.
 
 Prerequisites
 =============
-1. This plugin requires php-mcrypt to be installed on both server in order for it to work.
+1. This plugin requires php-mcrypt to be installed on both servers in order for it to work.
 
 Install
 =======
