@@ -11,7 +11,7 @@ The process is relatively secured by a secret key the administrator of both syst
 
 Prerequisites
 =============
-1. This plugin requires php-mcrypt to be installed on both servers in order for it to work.
+1. This plugin requires same version php-mcrypt to be installed on both servers in order for it to work.
 
 Install
 =======
